@@ -136,14 +136,14 @@ for t = lagOrder+1:length(testWindPower)
     end
 
     % Two-step prediction
-    % Determine the regime for the current observation
-    currentRegime2 = regimeTest2(t);
+    if t < length(testWindPower) - 1
+        % Determine the regime for the current observation
+        currentRegime2 = regimeTest2(t+1);
 
-    % Use the model for the current regime (2-hour predicted wind dir.)
-    mdl = models_TARX{currentRegime2};
-    if t < length(testWindPower)
+        % Use the model for the current regime (2-hour predicted wind dir.)
+        mdl = models_TARX{currentRegime2};
         X_AR_2 = [y_pred_TARX(t, 1), X_AR(1:end-1)];
-        X_X_2 = [testWindSpeed2(t), X_X(1:end-1)];
+        X_X_2 = [testWindSpeed2(t+1), X_X(1:end-1)];
         X_combined2 = [X_AR_2, X_X_2];
         y_pred_TARX(t+1, 2) = predict(mdl, X_combined2);
         if y_pred_TARX(t+1, 2) < 0
@@ -152,14 +152,15 @@ for t = lagOrder+1:length(testWindPower)
     end
 
     % Three-step prediction
-    % Determine the regime for the current observation
-    currentRegime3 = regimeTest3(t);
+    if t < length(testWindPower) - 2
+        % Determine the regime for the current observation
+        currentRegime3 = regimeTest3(t+2);
 
-    % Use the model for the current regime (3-hour predicted wind dir.)
-    mdl = models_TARX{currentRegime3};
-    if t < length(testWindPower)-1
+        % Use the model for the current regime (3-hour predicted wind dir.)
+        mdl = models_TARX{currentRegime3};
+
         X_AR_3 = [y_pred_TARX(t+1, 2), X_AR_2(1:end-1)];
-        X_X_3 = [testWindSpeed3(t), X_X_2(1:end-1)];
+        X_X_3 = [testWindSpeed3(t+2), X_X_2(1:end-1)];
         X_combined3 = [X_AR_3, X_X_3];
         y_pred_TARX(t+2, 3) = predict(mdl, X_combined3);
         if y_pred_TARX(t+2, 3) < 0
