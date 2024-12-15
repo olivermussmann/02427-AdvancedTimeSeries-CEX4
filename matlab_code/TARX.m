@@ -9,10 +9,12 @@ X.t = hours(X.t - X.t(1));
 
 % Extract relevant columns
 windPower = X.p;   % Measured wind power
-windSpeed = X.Ws1; % Forecasted wind speed (exogenous input)
-windSpeed2 = X.Ws2;
-windSpeed3 = X.Ws3;
-windDir = X.Wd1;   % Wind direction (for regimes)
+windSpeed = X.Ws1; % 1-hour forecasted wind speed (exogenous input)
+windSpeed2 = X.Ws2; % 2-hour forecasted wind speed (exogenous input)
+windSpeed3 = X.Ws3; % 3-hour forecasted wind speed (exogenous input)
+windDir = X.Wd1;   % 1-hour forecasted wind direction (for regimes)
+windDir2 = X.Wd2;   % 2-hour forecasted wind direction (for regimes)
+windDir3 = X.Wd3;   % 3-hour forecasted wind direction (for regimes)
 
 % Number of observations
 n = length(windPower);
@@ -30,6 +32,8 @@ testWindSpeed = windSpeed(splitIndex + 1:end);
 testWindSpeed2 = windSpeed2(splitIndex + 1:end);
 testWindSpeed3 = windSpeed3(splitIndex + 1:end);
 testWindDir = windDir(splitIndex + 1:end);
+testWindDir2 = windDir2(splitIndex + 1:end);
+testWindDir3 = windDir3(splitIndex + 1:end);
 
 %% ------------------------- Regime Definitions --------------------------
 
@@ -49,6 +53,16 @@ regimeTest = zeros(size(testWindDir));
 regimeTest(R1(testWindDir)) = 1;
 regimeTest(R2(testWindDir)) = 2;
 regimeTest(R3(testWindDir)) = 3;
+
+regimeTest2 = zeros(size(testWindDir2));
+regimeTest2(R1(testWindDir2)) = 1;
+regimeTest2(R2(testWindDir2)) = 2;
+regimeTest2(R3(testWindDir2)) = 3;
+
+regimeTest3 = zeros(size(testWindDir3));
+regimeTest3(R1(testWindDir3)) = 1;
+regimeTest3(R2(testWindDir3)) = 2;
+regimeTest3(R3(testWindDir3)) = 3;
 
 %% ------------------------- TARX Model Training -------------------------
 
@@ -122,6 +136,11 @@ for t = lagOrder+1:length(testWindPower)
     end
 
     % Two-step prediction
+    % Determine the regime for the current observation
+    currentRegime2 = regimeTest2(t);
+
+    % Use the model for the current regime (2-hour predicted wind dir.)
+    mdl = models_TARX{currentRegime2};
     if t < length(testWindPower)
         X_AR_2 = [y_pred_TARX(t, 1), X_AR(1:end-1)];
         X_X_2 = [testWindSpeed2(t), X_X(1:end-1)];
@@ -133,6 +152,11 @@ for t = lagOrder+1:length(testWindPower)
     end
 
     % Three-step prediction
+    % Determine the regime for the current observation
+    currentRegime3 = regimeTest3(t);
+
+    % Use the model for the current regime (3-hour predicted wind dir.)
+    mdl = models_TARX{currentRegime3};
     if t < length(testWindPower)-1
         X_AR_3 = [y_pred_TARX(t+1, 2), X_AR_2(1:end-1)];
         X_X_3 = [testWindSpeed3(t), X_X_2(1:end-1)];
