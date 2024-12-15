@@ -8,12 +8,17 @@ X = rmmissing(X); % Remove rows containing NaN's
 
 % Extract relevant columns
 windPower = X.p;   % Measured wind power
-windSpeed = X.Ws1; % Forecasted wind speed (input)
+windSpeed = X.Ws1; % 1-hour forecasted wind speed (input)
+windSpeed2 = X.Ws2; % 2-hour forecasted wind speed (input)
+windSpeed3 = X.Ws3; % 3-hour forecasted wind speed (input)
+
 
 % Ensure valid data for fitting (exclude zeros or negatives)
 validIdx = windPower > 0 & windSpeed > 0;
 windPower = windPower(validIdx);
 windSpeed = windSpeed(validIdx);
+windSpeed2 = windSpeed2(validIdx);
+windSpeed3 = windSpeed3(validIdx);
 
 % Number of observations
 n = length(windPower);
@@ -27,6 +32,8 @@ trainWindSpeed = windSpeed(1:splitIndex);
 
 testWindPower = windPower(splitIndex + 1:end);
 testWindSpeed = windSpeed(splitIndex + 1:end);
+testWindSpeed2 = windSpeed2(splitIndex + 1:end);
+testWindSpeed3 = windSpeed3(splitIndex + 1:end);
 
 %% ------------------- Sigmoid Power Curve Regression --------------------
 
@@ -70,12 +77,18 @@ for t = 1:length(testWindPower)
     % Multi-step predictions
     for step = 2:nSteps
         if t + step - 1 <= length(testWindPower)
-            % Use actual wind speed for exogenous input
-            wind_speed = testWindSpeed(t + step - 1);
-            y_pred_sigmoid(t + step - 1, step) = sigmoidFunc(optimalParams, wind_speed);
-            if y_pred_sigmoid(t + step - 1, step) < 0
-                y_pred_sigmoid(t + step - 1, step) = 0;
+            % Select the correct wind speed input
+            if step == 2
+                wind_speed = testWindSpeed2(t + step - 1);
+            else
+                wind_speed = testWindSpeed3(t + step - 1);
             end
+            
+            % Predict using the sigmoid function
+            y_pred_sigmoid(t + step - 1, step) = sigmoidFunc(optimalParams, wind_speed);
+            
+            % Ensure non-negative predictions
+            y_pred_sigmoid(t + step - 1, step) = max(y_pred_sigmoid(t + step - 1, step), 0);
         end
     end
 end
