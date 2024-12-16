@@ -20,7 +20,7 @@ clc; clear; close all;
 
 
 % Read the CSV file
-X = readtable('cex4WindDataInterpolated.csv', 'Delimiter', ',', 'ReadVariableNames', true);
+X = readtable('C:\Users\lucas\Documents\GitHub\02427-AdvancedTimeSeries-CEX4\comp_ex_4_scripts_2011\data\cex4WindDataInterpolated.csv', 'Delimiter', ',', 'ReadVariableNames', true);
 X = rmmissing(X); % Remove rows containing NaN's
 
 % Convert the 't' column to datetime format with UTC timezone
