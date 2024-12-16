@@ -194,8 +194,8 @@ function f = plotPredictions(y_true, y_pred, time, titleName)
     AIC = zeros(1, 3);
     BIC = zeros(1, 3);
     
-    f = figure('Units', 'pixels', 'Position', [600, 300, 800, 600]);
-    tiledlayout(3, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+    f = figure('Units', 'pixels', 'Position', [600, 300, 1000, 600]); % Adjusted for more space
+    t = tiledlayout(3, 8, 'TileSpacing', 'compact', 'Padding', 'compact');
 
     for i = 1:3
         shift = i; % For i-step predictions, predictions lead actual by (i-1)
@@ -224,8 +224,8 @@ function f = plotPredictions(y_true, y_pred, time, titleName)
         fprintf('  AIC: %.4f\n', AIC(i));
         fprintf('  BIC: %.4f\n\n', BIC(i));
         
-        % Plot data
-        ax = nexttile;
+        % Plot predictions
+        ax1 = nexttile(t, [1,5]); % Specify the span for predictions (6 columns)
         hold on;
         plot(time_shifted, actual_data, 'DisplayName', 'Actual', 'LineWidth', 2, 'Color', 'k');
         plot(time_shifted, pred_data, 'DisplayName', 'Predicted', 'LineWidth', 1.5, 'Color', 'r', 'LineStyle', '--');
@@ -233,14 +233,25 @@ function f = plotPredictions(y_true, y_pred, time, titleName)
         if i == 1
             legend('Location','northwest', 'Interpreter','latex');
         end
-        title(titleName{i}, 'Interpreter', 'latex');
+        title(['Prediction: ', titleName{i}], 'Interpreter', 'latex');
         xlabel('Time', 'Interpreter','latex');
         ylabel('Wind Power','Interpreter','latex');
         xlim([time_shifted(1) time_shifted(end)]);
         grid on;
         box on;
         hold off;
-        set(ax, 'FontSize', 13, 'TickLabelInterpreter', 'latex');
+        set(ax1, 'FontSize', 13, 'TickLabelInterpreter', 'latex');
+        
+        % Plot residuals
+        ax2 = nexttile(t, [1, 3]); % Specify the span for residuals (2 columns)
+        plot(time_shifted, residuals, 'LineWidth', 1.5, 'Color', 'b');
+        title(['Residuals: ', titleName{i}], 'Interpreter', 'latex');
+        xlabel('Time', 'Interpreter','latex');
+        ylabel('Residual','Interpreter','latex');
+        xlim([time_shifted(1) time_shifted(end)]);
+        grid on;
+        box on;
+        set(ax2, 'FontSize', 13, 'TickLabelInterpreter', 'latex');
     end
     
     % Display summary of metrics
@@ -249,8 +260,6 @@ function f = plotPredictions(y_true, y_pred, time, titleName)
     fprintf('  AIC: %.4f %.4f %.4f\n', AIC);
     fprintf('  BIC: %.4f %.4f %.4f\n', BIC);
 end
-
-
 
 % Plot predictions dynamically
 titles = {'TARX(5,3) - 1-step Predictions', 'TARX(5,3) - 2-step Predictions', 'TARX(5,3) - 3-step Predictions'};

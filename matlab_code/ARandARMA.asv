@@ -33,85 +33,34 @@ calculateAIC = @(RSS, numParams, numObs) 2 * numParams + numObs * log(RSS / numO
 calculateBIC = @(RSS, numParams, numObs) numObs * log(RSS / numObs) + numParams * log(numObs);
 
 % Function to plot predictions vs actual
-% Plot TARX predictions
 function f = plotPredictions(y_true, y_pred, time, titleName)
-    % Extract the last 101 points (assuming at least 101 data points)
-    y_true_window = y_true(end-100:end);
-    y_pred_window = y_pred(end-100:end, :);
-    time_window = time(end-100:end);
-
-    % Initialize arrays to store metrics
-    RMSE = zeros(1, 3);
-    AIC = zeros(1, 3);
-    BIC = zeros(1, 3);
     
-    f = figure('Units', 'pixels', 'Position', [600, 300, 1000, 600]); % Adjusted for more space
-    t = tiledlayout(3, 8, 'TileSpacing', 'compact', 'Padding', 'compact');
+    data = {y_true(end-100:end), y_pred(end-100:end, 1), y_true(end-100:end), y_pred(end-100:end, 2), ...
+        y_true(end-100:end), y_pred(end-100:end, 3)};
+    
+    
 
+    f = figure('Units', 'pixels', 'Position', [600, 300, 800, 600]);
+    tiledlayout(3, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+    
     for i = 1:3
-        shift = i; % For i-step predictions, predictions lead actual by (i-1)
-        
-        % Align data:
-        % Actual: remove the last 'shift' points, since we can't predict those far ahead
-        actual_data = y_true_window(1:end-shift);
-        % Predicted: remove the first 'shift' points, as these predictions forecast values further ahead
-        pred_data = y_pred_window(shift+1:end, i);
-        % Time: must match the length of actual_data
-        time_shifted = time_window(1+shift:end);
-
-        % Calculate residuals and metrics
-        residuals = actual_data - pred_data;
-        RSS = sum(residuals.^2);
-        N = length(actual_data);
-        k = 1; % Assuming 1 parameter (e.g., single model output per prediction)
-
-        RMSE(i) = sqrt(RSS / N);
-        AIC(i) = N * log(RSS / N) + 2 * k;
-        BIC(i) = N * log(RSS / N) + k * log(N);
-        
-        % Display metrics
-        fprintf('Step-%d Predictions:\n', i);
-        fprintf('  RMSE: %.4f\n', RMSE(i));
-        fprintf('  AIC: %.4f\n', AIC(i));
-        fprintf('  BIC: %.4f\n\n', BIC(i));
-        
-        % Plot predictions
-        ax1 = nexttile(t, [1,5]); % Specify the span for predictions (6 columns)
+        ax = nexttile;
         hold on;
-        plot(time_shifted, actual_data, 'DisplayName', 'Actual', 'LineWidth', 2, 'Color', 'k');
-        plot(time_shifted, pred_data, 'DisplayName', 'Predicted', 'LineWidth', 1.5, 'Color', 'r', 'LineStyle', '--');
-        
+        plot(time, data{2*i-1}, 'b', 'DisplayName', 'Actual', 'LineWidth', 2, 'Color', 'k');
+        plot(time, data{2*i}, 'r', 'DisplayName', 'Predicted', 'LineWidth', 1.5, 'Color', 'r', 'LineStyle', '--');
         if i == 1
             legend('Location','northwest', 'Interpreter','latex');
         end
-        title(['Prediction: ', titleName{i}], 'Interpreter', 'latex');
-        xlabel('Time', 'Interpreter','latex');
+        title(titleName{i}, 'Interpreter', 'latex');
+        xlabel('Time Index', 'Interpreter','latex');
         ylabel('Wind Power','Interpreter','latex');
-        xlim([time_shifted(1) time_shifted(end)]);
+        xlim([time(1) time(end)])
         grid on;
         box on;
         hold off;
-        set(ax1, 'FontSize', 13, 'TickLabelInterpreter', 'latex');
-        
-        % Plot residuals
-        ax2 = nexttile(t, [1, 3]); % Specify the span for residuals (2 columns)
-        plot(time_shifted, residuals, 'LineWidth', 1.5, 'Color', 'b');
-        title(['Residuals: ', titleName{i}], 'Interpreter', 'latex');
-        xlabel('Time', 'Interpreter','latex');
-        ylabel('Residual','Interpreter','latex');
-        xlim([time_shifted(1) time_shifted(end)]);
-        grid on;
-        box on;
-        set(ax2, 'FontSize', 13, 'TickLabelInterpreter', 'latex');
+        set(ax, 'FontSize', 13, 'TickLabelInterpreter', 'latex')
     end
-    
-    % Display summary of metrics
-    fprintf('Summary of Metrics:\n');
-    fprintf('  RMSE: %.4f %.4f %.4f\n', RMSE);
-    fprintf('  AIC: %.4f %.4f %.4f\n', AIC);
-    fprintf('  BIC: %.4f %.4f %.4f\n', BIC);
 end
-
 
 %% ------------------------- AR(1) Model ----------------------------------
 
@@ -312,6 +261,7 @@ results = table({'AR(1)'; 'AR(4)'; 'ARMA(4,3)'}, ...
                 'VariableNames', {'Model', 'RMSE', 'AIC', 'BIC'});
 
 disp(results);
+%%
 
 
 %% Save script to Github
