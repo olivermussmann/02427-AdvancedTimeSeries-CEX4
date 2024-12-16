@@ -178,7 +178,18 @@ end
 
 
 
+%% Calculate RSS, RMSE, AIC, and BIC (Three-step)
+RSS3_TARX = sum(residuals3_TARX.^2);
+RMSE3_TARX = sqrt(mean(residuals3_TARX.^2));
+numParams3_TARX = 3 * (lagOrder + 1); % 3 regimes, (lagOrder + 1) parameters per regime
+AIC3_TARX = length(testWindPower) * log(RSS3_TARX / length(testWindPower)) + 2 * numParams3_TARX;
+BIC3_TARX = length(testWindPower) * log(RSS3_TARX / length(testWindPower)) + numParams3_TARX * log(length(testWindPower));
 
+% Display metrics
+disp('Performance metrics of One-step prediction')
+disp(['TARX RMSE: ', num2str(RMSE3_TARX)]);
+disp(['TARX AIC: ', num2str(AIC3_TARX)]);
+disp(['TARX BIC: ', num2str(BIC3_TARX)]);
 
 %% ------------------------- Plot Predictions ----------------------------
 

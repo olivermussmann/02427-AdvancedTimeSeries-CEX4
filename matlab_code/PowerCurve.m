@@ -3,12 +3,12 @@ clc; clear; close all;
 %% ------------------------- Collect data ---------------------------------
 
 % Read the CSV file
-X = readtable('cex4WindDataInterpolated.csv', 'Delimiter', ',', 'ReadVariableNames', true);
+X = readtable('C:\Users\lucas\Documents\GitHub\02427-AdvancedTimeSeries-CEX4\comp_ex_4_scripts_2011\data\cex4WindDataInterpolated.csv', 'Delimiter', ',', 'ReadVariableNames', true);
 X = rmmissing(X); % Remove rows containing NaN's
 
 % Extract relevant columns
-windPower = X.p;   % Measured wind power
-windSpeed = X.Ws1; % 1-hour forecasted wind speed (input)
+windPower  = X.p;   % Measured wind power
+windSpeed  = X.Ws1; % 1-hour forecasted wind speed (input)
 windSpeed2 = X.Ws2; % 2-hour forecasted wind speed (input)
 windSpeed3 = X.Ws3; % 3-hour forecasted wind speed (input)
 
