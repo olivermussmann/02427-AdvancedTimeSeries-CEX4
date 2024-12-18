@@ -23,89 +23,54 @@ testWindPower = windPower(splitIndex + 1:end);
 
 %% ------------------------- Helper Functions ----------------------------
 
-% Function to calculate RMSE
-calculateRMSE = @(y_true, y_pred) sqrt(mean((y_true - y_pred).^2));
-
-% Function to calculate AIC
-calculateAIC = @(RSS, numParams, numObs) 2 * numParams + numObs * log(RSS / numObs);
-
-% Function to calculate BIC
-calculateBIC = @(RSS, numParams, numObs) numObs * log(RSS / numObs) + numParams * log(numObs);
-
-% Function to plot predictions vs actual
-% Plot TARX predictions
-function f = plotPredictions(y_true, y_pred, time, titleName)
-    % Extract the last 101 points (assuming at least 101 data points)
-    y_true_window = y_true(end-100:end);
-    y_pred_window = y_pred(end-100:end, :);
-    time_window = time(end-100:end);
-
-    % Initialize arrays to store metrics
+function [RMSE, AIC, BIC] = calculateMetrics(y_true, y_pred, k)
     RMSE = zeros(1, 3);
     AIC = zeros(1, 3);
     BIC = zeros(1, 3);
-    
-    f = figure('Units', 'pixels', 'Position', [600, 300, 1000, 600]); % Adjusted for more space
-    t = tiledlayout(3, 8, 'TileSpacing', 'compact', 'Padding', 'compact');
 
     for i = 1:3
-        shift = i; % For i-step predictions, predictions lead actual by (i-1)
+        % Valid indices for comparison
+        validIdx = ~isnan(y_pred(:, i));
+        y_true_valid = y_true(validIdx); % Where i is the step-ahead (1, 2, or 3)
+        y_pred_valid = y_pred(validIdx, i);
         
-        % Align data:
-        % Actual: remove the last 'shift' points, since we can't predict those far ahead
-        actual_data = y_true_window(1:end-shift);
-        % Predicted: remove the first 'shift' points, as these predictions forecast values further ahead
-        pred_data = y_pred_window(shift+1:end, i);
-        % Time: must match the length of actual_data
-        time_shifted = time_window(1+shift:end);
+        % Residuals
+        residuals = y_true_valid - y_pred_valid;
 
-
-        % Calculate residuals and metrics
-        residuals = actual_data - pred_data;
+        % Residual Sum of Squares
         RSS = sum(residuals.^2);
-        N = length(actual_data);
-        k = 1; % Assuming 1 parameter (e.g., single model output per prediction)
+        N = length(y_true_valid);
 
+        % Compute Metrics
         RMSE(i) = sqrt(RSS / N);
         AIC(i) = N * log(RSS / N) + 2 * k;
         BIC(i) = N * log(RSS / N) + k * log(N);
-        
-        % Display metrics
-        fprintf('Step-%d Predictions:\n', i);
-        fprintf('  RMSE: %.4f\n', RMSE(i));
-        fprintf('  AIC: %.4f\n', AIC(i));
-        fprintf('  BIC: %.4f\n\n', BIC(i));
-        
-        % Plot predictions
-        ax1 = nexttile(t, [1,5]); % Specify the span for predictions (6 columns)
-        hold on;
-        plot(time_shifted, actual_data, 'DisplayName', 'Actual', 'LineWidth', 2, 'Color', 'k');
-        plot(time_shifted, pred_data, 'DisplayName', 'Predicted', 'LineWidth', 1.5, 'Color', 'r', 'LineStyle', '--');
-        
-        if i == 1
-            legend('Location','northwest', 'Interpreter','latex');
-        end
-        title(['Prediction: ', titleName{i}], 'Interpreter', 'latex');
-        xlabel('Time', 'Interpreter','latex');
-        ylabel('Wind Power','Interpreter','latex');
-        xlim([time_shifted(1) time_shifted(end)]);
-        grid on;
-        box on;
-        hold off;
-        set(ax1, 'FontSize', 13, 'TickLabelInterpreter', 'latex');
-        
-        % Plot residuals
-        ax2 = nexttile(t, [1, 3]); % Specify the span for residuals (2 columns)
-        plot(time_shifted, residuals, 'LineWidth', 1.5, 'Color', 'b');
-        title(['Residuals: ', titleName{i}], 'Interpreter', 'latex');
-        xlabel('Time', 'Interpreter','latex');
-        ylabel('Residual','Interpreter','latex');
-        xlim([time_shifted(1) time_shifted(end)]);
-        grid on;
-        box on;
-        set(ax2, 'FontSize', 13, 'TickLabelInterpreter', 'latex');
     end
+end
 
+function f = plotPredictions(y_true, y_pred, time, titleName)
+    f = figure('Units', 'pixels', 'Position', [600, 300, 800, 600]);
+    tiledlayout(3, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+    for i = 1:3
+        ax = nexttile;
+        hold on;
+
+        plot_length = length(time);
+        time_valid = time(i:end);
+        y_true_valid = y_true(end - plot_length:end-i);
+        y_pred_valid = y_pred(end - plot_length+i:end, i);
+
+        plot(time_valid, y_true_valid, 'k', 'DisplayName', 'Actual', 'LineWidth', 2);
+        plot(time_valid, y_pred_valid, 'r--', 'DisplayName', 'Predicted', 'LineWidth', 1.5);
+        
+        title(titleName{i}, 'Interpreter', 'latex');
+        xlabel('Time', 'Interpreter', 'latex');
+        ylabel('Wind Power', 'Interpreter', 'latex');
+        legend('Location', 'northwest', 'Interpreter', 'latex');
+        grid on;
+        hold off;
+    end
 end
 
 
@@ -143,6 +108,21 @@ for t = 1:length(testWindPower)
     end
 end
 
+% Define data used for evaluation of predictions
+y_pred_eval = y_pred_AR1(end-1000+1:end, :);
+testWindPower_eval = testWindPower(end-1000+1:end);
+
+% Calculate and print metrics
+[RMSE_AR1, AIC_AR1, BIC_AR1] = calculateMetrics(testWindPower_eval, y_pred_eval, model_AR1_Fit.P + model_AR1_Fit.Q + model_AR1_Fit.D + 1);
+
+fprintf('Prediction Metrics:\n');
+for i = 1:3
+    fprintf('Step-%d Predictions:\n', i);
+    fprintf('  RMSE: %.4f\n', RMSE_AR1(i));
+    fprintf('  AIC: %.4f\n', AIC_AR1(i));
+    fprintf('  BIC: %.4f\n', BIC_AR1(i));
+end
+
 % Plot predictions dynamically
 titles = {'AR(1) - 1-step Predictions', 'AR(1) - 2-step Predictions', 'AR(1) - 3-step Predictions'};
 
@@ -162,7 +142,7 @@ y_pred_AR4 = zeros(length(testWindPower), 3);
 for t = 1:length(testWindPower)
     % Forecast one step ahead using previous training data
     currentData = [trainWindPower; testWindPower(1:t-1)];
-    disp(currentData)
+    
     y_pred_AR4(t, 1) = forecast(model_AR4_Fit, 1, 'Y0', currentData);
     
     % Check if we can store the second step prediction
@@ -182,7 +162,20 @@ for t = 1:length(testWindPower)
         y_pred_AR4(t, y_pred_AR4(t, :) < 0) = 0;
     end
 end
+% Define data used for evaluation of predictions
+y_pred_eval = y_pred_AR4(end-1000+1:end, :);
+testWindPower_eval = testWindPower(end-1000+1:end);
 
+% Calculate and print metrics
+[RMSE_AR4, AIC_AR4, BIC_AR4] = calculateMetrics(testWindPower_eval, y_pred_eval, model_AR4_Fit.P + model_AR4_Fit.Q + model_AR4_Fit.D + 1);
+
+fprintf('Prediction Metrics:\n');
+for i = 1:3
+    fprintf('Step-%d Predictions:\n', i);
+    fprintf('  RMSE: %.4f\n', RMSE_AR4(i));
+    fprintf('  AIC: %.4f\n', AIC_AR4(i));
+    fprintf('  BIC: %.4f\n', BIC_AR4(i));
+end
 
 % Plot predictions dynamically
 titles = {'AR(4) - 1-step Predictions', 'AR(4) - 2-step Predictions', 'AR(4) - 3-step Predictions'};
@@ -222,28 +215,19 @@ for t = 1:length(testWindPower)
     end
 end
 
-% Define steps and parameters
-steps = 1:3;
-nSteps = length(steps);
-nData = length(testWindPower);
-params = 8; % Number of parameters: 4 AR + 3 MA + variance
+% Define data used for evaluation of predictions
+y_pred_eval = y_pred_ARMA(end-1000+1:end, :);
+testWindPower_eval = testWindPower(end-1000+1:end);
 
-% Compute residuals for all steps at once
-residuals_ARMA = testWindPower - y_pred_ARMA;
+% Calculate and print metrics
+[RMSE_ARMA, AIC_ARMA, BIC_ARMA] = calculateMetrics(testWindPower_eval, y_pred_eval, model_ARMA_Fit.P + model_ARMA_Fit.Q + model_ARMA_Fit.D + 1);
 
-% Compute RSS, RMSE, AIC, and BIC in a vectorized manner
-RSS_ARMA = sum(residuals_ARMA.^2, 1);
-RMSE_ARMA = sqrt(mean(residuals_ARMA.^2, 1));
-AIC_ARMA = nData * log(RSS_ARMA / nData) + 2 * params;
-BIC_ARMA = nData * log(RSS_ARMA / nData) + params * log(nData);
-
-% Display metrics using a loop for compactness
-metrics = ["RMSE", "AIC", "BIC"];
-for step = steps
-    disp(['Metrics of ', num2str(step), '-step predictions']);
-    disp(['ARMA(4,3) RMSE: ', num2str(RMSE_ARMA(step))]);
-    disp(['ARMA(4,3) AIC: ', num2str(AIC_ARMA(step))]);
-    disp(['ARMA(4,3) BIC: ', num2str(BIC_ARMA(step))]);
+fprintf('Prediction Metrics:\n');
+for i = 1:3
+    fprintf('Step-%d Predictions:\n', i);
+    fprintf('  RMSE: %.4f\n', RMSE_ARMA(i));
+    fprintf('  AIC: %.4f\n', AIC_ARMA(i));
+    fprintf('  BIC: %.4f\n', BIC_ARMA(i));
 end
 
 % Plot predictions dynamically

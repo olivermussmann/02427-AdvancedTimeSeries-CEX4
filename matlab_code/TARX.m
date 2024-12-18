@@ -186,7 +186,7 @@ function [RMSE, AIC, BIC] = calculateMetrics(y_true, y_pred, k)
     for i = 1:3
         % Valid indices for comparison
         validIdx = ~isnan(y_pred(:, i));
-        y_true_valid = y_true(validIdx + i); % Where i is the step-ahead (1, 2, or 3)
+        y_true_valid = y_true(validIdx); % Where i is the step-ahead (1, 2, or 3)
         y_pred_valid = y_pred(validIdx, i);
         
         % Residuals
@@ -219,7 +219,6 @@ function f = plotPredictions(y_true, y_pred, time, titleName)
         disp(length(time_valid))
         disp(length(y_true_valid))
         disp(length(y_pred_valid))
-        
 
         plot(time_valid, y_true_valid, 'k', 'DisplayName', 'Actual', 'LineWidth', 2);
         plot(time_valid, y_pred_valid, 'r--', 'DisplayName', 'Predicted', 'LineWidth', 1.5);
