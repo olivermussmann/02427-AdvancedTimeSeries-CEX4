@@ -1,9 +1,9 @@
 clc; clear; close all;
 
-%% ------------------------- Collect data ---------------------------------
+%% ------------------------- Collect Data ---------------------------------
 
 % Read the CSV file
-X = readtable('C:\Users\lucas\Documents\GitHub\02427-AdvancedTimeSeries-CEX4\comp_ex_4_scripts_2011\data\cex4WindDataInterpolated.csv', 'Delimiter', ',', 'ReadVariableNames', true);
+X = readtable('cex4WindDataInterpolated.csv', 'Delimiter', ',', 'ReadVariableNames', true);
 X = rmmissing(X); % Remove rows containing NaN's
 X.t = hours(X.t - X.t(1));
 
@@ -20,7 +20,7 @@ windDir3 = X.Wd3;   % 3-hour forecasted wind direction (for regimes)
 n = length(windPower);
 
 % Define the split index
-splitIndex = n - 1000;
+splitIndex = n - 2000;
 
 % Split into training and testing sets
 trainWindPower = windPower(1:splitIndex);
@@ -38,7 +38,6 @@ testWindDir2 = windDir2(splitIndex + 1:end);
 testWindDir3 = windDir3(splitIndex + 1:end);
 
 testTime = X.t(splitIndex + 1:end);
-
 
 %% ------------------------- Regime Definitions --------------------------
 
@@ -72,8 +71,8 @@ regimeTest3(R3(testWindDir3)) = 3;
 %% ------------------------- TARX Model Training -------------------------
 
 % AR lag order
-lagOrder = 5;
-exoOrder = 3;
+lagOrder = 7;
+exoOrder = 5;
 
 % Prepare data storage for models
 models_TARX = cell(1, 3);
@@ -86,10 +85,10 @@ for regime = 1:3
     x_train = trainWindSpeed(idx);
     nTrain = length(y_train);
     
-    % Construct lagged AR terms
+    % Construct lagged AR and exogenous terms
     if nTrain > lagOrder
         X_AR = zeros(nTrain - lagOrder, lagOrder);  % AR lags
-        X_X = x_train(lagOrder + 1:end);            % Exogenous variable
+        X_X = zeros(nTrain - lagOrder, exoOrder);  % Exogenous terms
         
         for i = 1:lagOrder
             X_AR(:, i) = y_train(lagOrder + 1 - i:nTrain - i);
@@ -105,166 +104,121 @@ for regime = 1:3
         
         % Fit linear model for the current regime
         models_TARX{regime} = fitlm(X_combined, y_target);
-
     end
 end
 
-%% ------------------------- TARX 1-Step Predictions ---------------------
+%% ------------------------- TARX Multi-Step Predictions -----------------
 
-% Predict for test data (one-step ahead)
-y_pred_TARX = zeros(size(testWindPower, 3));
-for t = lagOrder+1:length(testWindPower)
-    % Determine the regime for the current observation
-    currentRegime = regimeTest(t);
+% Number of observations
+n = length(windPower);
 
-    % Use the model for the current regime
-    mdl = models_TARX{currentRegime};
-    
-    % Ensure enough past values are available
-    if t > lagOrder
-        X_AR = flip(testWindPower(t - lagOrder:t - 1))'; % Use past actual values
-    else
-        % Use available values and pad with NaN for initial steps
-        X_AR = [NaN(1, lagOrder - (t - 1)), flip(testWindPower(1:t - 1))'];
-    end
-    
-    % Include the exogenous variable
-    for i = 1:exoOrder
-        X_X = flip(testWindSpeed(t-i+1:t))'; % Exogenous variable
-    end
-    X_combined = [X_AR, X_X];
-    
+% Combine training and test data for recursive predictions
+Power_data = [trainWindPower; testWindPower];
+
+% Predict for test data (one-step, two-step, three-step ahead)
+y_pred_TARX = zeros(length(testWindPower), 3);
+for t = splitIndex + 1:n
     % One-step prediction
-    y_pred_TARX(t, 1) = predict(mdl, X_combined);
-    if y_pred_TARX(t, 1) < 0
-        y_pred_TARX(t, 1) = 0;
-    end
+    currentRegime = regimeTest(t - splitIndex);
+    mdl = models_TARX{currentRegime};
+    X_AR = flip(Power_data(t-lagOrder:t-1))';
+    X_X = flip(windSpeed(t-exoOrder:t-1))';
+    X_combined = [X_AR, X_X];
+    y_pred_TARX(t - splitIndex, 1) = predict(mdl, X_combined);
+    y_pred_TARX(t - splitIndex, 1) = max(y_pred_TARX(t - splitIndex, 1), 0); % Ensure non-negative
 
     % Two-step prediction
-    if t < length(testWindPower) - 1
-        % Determine the regime for the current observation
-        currentRegime2 = regimeTest2(t+1);
-
-        % Use the model for the current regime (2-hour predicted wind dir.)
-        mdl = models_TARX{currentRegime2};
-        X_AR_2 = [y_pred_TARX(t, 1), X_AR(1:end-1)];
-        X_X_2 = [testWindSpeed2(t+1), X_X(1:end-1)];
+    if t - splitIndex > 1
+        currentRegime2 = regimeTest2(t - splitIndex);
+        mdl2 = models_TARX{currentRegime2};
+        X_AR_2 = [y_pred_TARX(t - splitIndex - 1, 1), flip(Power_data(t-lagOrder:t-2))'];
+        X_X_2 = [windSpeed2(t-1), flip(windSpeed(t-exoOrder:t-2))'];
         X_combined2 = [X_AR_2, X_X_2];
-        y_pred_TARX(t+1, 2) = predict(mdl, X_combined2);
-        if y_pred_TARX(t+1, 2) < 0
-            y_pred_TARX(t+1, 2) = 0;
-        end
+        y_pred_TARX(t - splitIndex, 2) = predict(mdl2, X_combined2);
+        y_pred_TARX(t - splitIndex, 2) = max(y_pred_TARX(t - splitIndex, 2), 0);
     end
 
     % Three-step prediction
-    if t < length(testWindPower) - 2
-        % Determine the regime for the current observation
-        currentRegime3 = regimeTest3(t+2);
-
-        % Use the model for the current regime (3-hour predicted wind dir.)
-        mdl = models_TARX{currentRegime3};
-
-        X_AR_3 = [y_pred_TARX(t+1, 2), X_AR_2(1:end-1)];
-        X_X_3 = [testWindSpeed3(t+2), X_X_2(1:end-1)];
+    if t - splitIndex > 2
+        currentRegime3 = regimeTest3(t - splitIndex);
+        mdl3 = models_TARX{currentRegime3};
+        X_AR_3 = [y_pred_TARX(t - splitIndex - 1, 2), y_pred_TARX(t - splitIndex - 2, 1), flip(Power_data(t-lagOrder:t-3))'];
+        X_X_3 = [windSpeed3(t-1), windSpeed2(t-2), flip(windSpeed(t-exoOrder:t-3))'];
         X_combined3 = [X_AR_3, X_X_3];
-        y_pred_TARX(t+2, 3) = predict(mdl, X_combined3);
-        if y_pred_TARX(t+2, 3) < 0
-            y_pred_TARX(t+2, 3) = 0;
-        end
+        y_pred_TARX(t - splitIndex, 3) = predict(mdl3, X_combined3);
+        y_pred_TARX(t - splitIndex, 3) = max(y_pred_TARX(t - splitIndex, 3), 0);
     end
-
 end
 
+%% ------------------------- Metrics and Plotting ------------------------
+
+% Define data used for evaluation of predictions
+y_pred_eval = y_pred_TARX(end-1000+1:end, :);
+testWindPower_eval = testWindPower(end-1000+1:end);
 
 
+% Calculate and print metrics
+[RMSE, AIC, BIC] = calculateMetrics(testWindPower_eval, y_pred_eval, mdl.NumEstimatedCoefficients);
 
+fprintf('Prediction Metrics:\n');
+for i = 1:3
+    fprintf('Step-%d Predictions:\n', i);
+    fprintf('  RMSE: %.4f\n', RMSE(i));
+    fprintf('  AIC: %.4f\n', AIC(i));
+    fprintf('  BIC: %.4f\n', BIC(i));
+end
 
+% Plot predictions
+titles = {'TARX(7,5) - 1-step Predictions', 'TARX(7,5) - 2-step Predictions', 'TARX(7,5) - 3-step Predictions'};
+f = plotPredictions(testWindPower, y_pred_TARX, testTime(end-100:end), titles);
 
-%% ------------------------- Plot Predictions ----------------------------
-
-% Plot TARX predictions
-function f = plotPredictions(y_true, y_pred, time, titleName)
-    % Extract the last 101 points (assuming at least 101 data points)
-    y_true_window = y_true(end-100:end);
-    y_pred_window = y_pred(end-100:end, :);
-    time_window = time(end-100:end);
-
-    % Initialize arrays to store metrics
+function [RMSE, AIC, BIC] = calculateMetrics(y_true, y_pred, k)
     RMSE = zeros(1, 3);
     AIC = zeros(1, 3);
     BIC = zeros(1, 3);
-    
-    f = figure('Units', 'pixels', 'Position', [600, 300, 1000, 600]); % Adjusted for more space
-    t = tiledlayout(3, 8, 'TileSpacing', 'compact', 'Padding', 'compact');
 
     for i = 1:3
-        shift = i; % For i-step predictions, predictions lead actual by (i-1)
-        
-        % Align data:
-        % Actual: remove the last 'shift' points, since we can't predict those far ahead
-        actual_data = y_true_window(1:end-shift);
-        % Predicted: remove the first 'shift' points, as these predictions forecast values further ahead
-        pred_data = y_pred_window(shift+1:end, i);
-        % Time: must match the length of actual_data
-        time_shifted = time_window(1+shift:end);
+        % Valid indices for comparison
+        validIdx = ~isnan(y_pred(:, i));
+        y_true_valid = y_true(validIdx);
+        y_pred_valid = y_pred(validIdx, i);
 
-        % Calculate residuals and metrics
-        residuals = actual_data - pred_data;
+        % Residuals
+        residuals = y_true_valid - y_pred_valid;
+
+        % Residual Sum of Squares
         RSS = sum(residuals.^2);
-        N = length(actual_data);
-        k = 1; % Assuming 1 parameter (e.g., single model output per prediction)
+        N = length(y_true_valid);
 
+        % Compute Metrics
         RMSE(i) = sqrt(RSS / N);
         AIC(i) = N * log(RSS / N) + 2 * k;
         BIC(i) = N * log(RSS / N) + k * log(N);
-        
-        % Display metrics
-        fprintf('Step-%d Predictions:\n', i);
-        fprintf('  RMSE: %.4f\n', RMSE(i));
-        fprintf('  AIC: %.4f\n', AIC(i));
-        fprintf('  BIC: %.4f\n\n', BIC(i));
-        
-        % Plot predictions
-        ax1 = nexttile(t, [1,5]); % Specify the span for predictions (6 columns)
-        hold on;
-        plot(time_shifted, actual_data, 'DisplayName', 'Actual', 'LineWidth', 2, 'Color', 'k');
-        plot(time_shifted, pred_data, 'DisplayName', 'Predicted', 'LineWidth', 1.5, 'Color', 'r', 'LineStyle', '--');
-        
-        if i == 1
-            legend('Location','northwest', 'Interpreter','latex');
-        end
-        title(['Prediction: ', titleName{i}], 'Interpreter', 'latex');
-        xlabel('Time', 'Interpreter','latex');
-        ylabel('Wind Power','Interpreter','latex');
-        xlim([time_shifted(1) time_shifted(end)]);
-        grid on;
-        box on;
-        hold off;
-        set(ax1, 'FontSize', 13, 'TickLabelInterpreter', 'latex');
-        
-        % Plot residuals
-        ax2 = nexttile(t, [1, 3]); % Specify the span for residuals (2 columns)
-        plot(time_shifted, residuals, 'LineWidth', 1.5, 'Color', 'b');
-        title(['Residuals: ', titleName{i}], 'Interpreter', 'latex');
-        xlabel('Time', 'Interpreter','latex');
-        ylabel('Residual','Interpreter','latex');
-        xlim([time_shifted(1) time_shifted(end)]);
-        grid on;
-        box on;
-        set(ax2, 'FontSize', 13, 'TickLabelInterpreter', 'latex');
     end
-    
-    % Display summary of metrics
-    fprintf('Summary of Metrics:\n');
-    fprintf('  RMSE: %.4f %.4f %.4f\n', RMSE);
-    fprintf('  AIC: %.4f %.4f %.4f\n', AIC);
-    fprintf('  BIC: %.4f %.4f %.4f\n', BIC);
 end
 
-% Plot predictions dynamically
-titles = {'TARX(5,3) - 1-step Predictions', 'TARX(5,3) - 2-step Predictions', 'TARX(5,3) - 3-step Predictions'};
-f = plotPredictions(testWindPower, y_pred_TARX, X.t(end-100:end), titles);
-exportgraphics(f,'TARX_pred.pdf', 'ContentType', 'vector')
+function f = plotPredictions(y_true, y_pred, time, titleName)
+    f = figure('Units', 'pixels', 'Position', [600, 300, 800, 600]);
+    tiledlayout(3, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+    for i = 1:3
+        ax = nexttile;
+        hold on;
+
+        plot(time, y_true(end-100:end), 'k', 'DisplayName', 'Actual', 'LineWidth', 2);
+        plot(time, y_pred(end-100:end, i), 'r--', 'DisplayName', 'Predicted', 'LineWidth', 1.5);
+
+        title(titleName{i}, 'Interpreter', 'latex');
+        xlabel('Time', 'Interpreter', 'latex');
+        ylabel('Wind Power', 'Interpreter', 'latex');
+        legend('Location', 'northwest', 'Interpreter', 'latex');
+        grid on;
+        hold off;
+    end
+end
+
+% Save plot as a PDF
+exportgraphics(f, 'TARX_pred.pdf', 'ContentType', 'vector');
 
 %% Save script to Github
 
