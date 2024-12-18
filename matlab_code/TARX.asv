@@ -210,19 +210,16 @@ function f = plotPredictions(y_true, y_pred, time, titleName)
     for i = 1:3
         ax = nexttile;
         hold on;
-
-        plot_length = length(time);
-        time_valid = time(i:end);
-        y_true_valid = y_true(end - plot_length:end-i);
-        y_pred_valid = y_pred(end - plot_length+i:end, i);
         
-        disp(length(time_valid))
-        disp(length(y_true_valid))
+        time_valid = time(i:end);
+        y_true_valid = y_true(i:end);
+        y_pred_valid = y_pred(1:end, i);
+        
         disp(length(y_pred_valid))
         
 
         plot(time_valid, y_true_valid, 'k', 'DisplayName', 'Actual', 'LineWidth', 2);
-        plot(time_valid, y_pred_valid, 'r--', 'DisplayName', 'Predicted', 'LineWidth', 1.5);
+        plot(time_valid,  y_pred_valid, 'r--', 'DisplayName', 'Predicted', 'LineWidth', 1.5);
         
         title(titleName{i}, 'Interpreter', 'latex');
         xlabel('Time', 'Interpreter', 'latex');

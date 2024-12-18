@@ -59,6 +59,7 @@ function f = plotPredictions(y_true, y_pred, time, titleName)
         % Time: must match the length of actual_data
         time_shifted = time_window(1+shift:end);
 
+
         % Calculate residuals and metrics
         residuals = actual_data - pred_data;
         RSS = sum(residuals.^2);
@@ -104,12 +105,7 @@ function f = plotPredictions(y_true, y_pred, time, titleName)
         box on;
         set(ax2, 'FontSize', 13, 'TickLabelInterpreter', 'latex');
     end
-    
-    % Display summary of metrics
-    fprintf('Summary of Metrics:\n');
-    fprintf('  RMSE: %.4f %.4f %.4f\n', RMSE);
-    fprintf('  AIC: %.4f %.4f %.4f\n', AIC);
-    fprintf('  BIC: %.4f %.4f %.4f\n', BIC);
+
 end
 
 
@@ -126,6 +122,7 @@ y_pred_AR1 = zeros(length(testWindPower), 3);
 for t = 1:length(testWindPower)
     % Forecast one step ahead using previous training data
     currentData = [trainWindPower; testWindPower(1:t-1)];
+    
     y_pred_AR1(t, 1) = forecast(model_AR1_Fit, 1, 'Y0', currentData);
     
     % Check if we can store the second step prediction
@@ -146,33 +143,9 @@ for t = 1:length(testWindPower)
     end
 end
 
-
-% Define steps and parameters
-steps = 1:3;
-nSteps = length(steps);
-nData = length(testWindPower);
-params = 2; % Number of parameters: AR(1) + variance
-
-% Compute residuals for all steps at once
-residuals_AR1 = testWindPower - y_pred_AR1;
-
-% Compute RSS, RMSE, AIC, and BIC in a vectorized manner
-RSS_AR1 = sum(residuals_AR1.^2, 1);
-RMSE_AR1 = sqrt(mean(residuals_AR1.^2, 1));
-AIC_AR1 = nData * log(RSS_AR1 / nData) + 2 * params;
-BIC_AR1 = nData * log(RSS_AR1 / nData) + params * log(nData);
-
-% Display metrics using a loop for compactness
-metrics = ["RMSE", "AIC", "BIC"];
-for step = steps
-    disp(['Metrics of ', num2str(step), '-step predictions']);
-    disp(['AR(1) RMSE: ', num2str(RMSE_AR1(step))]);
-    disp(['AR(1) AIC: ', num2str(AIC_AR1(step))]);
-    disp(['AR(1) BIC: ', num2str(BIC_AR1(step))]);
-end
-
 % Plot predictions dynamically
 titles = {'AR(1) - 1-step Predictions', 'AR(1) - 2-step Predictions', 'AR(1) - 3-step Predictions'};
+
 f = plotPredictions(testWindPower, y_pred_AR1, X.t(end-100:end), titles);
 exportgraphics(f,'AR1_pred.pdf', 'ContentType', 'vector')
 
@@ -189,6 +162,7 @@ y_pred_AR4 = zeros(length(testWindPower), 3);
 for t = 1:length(testWindPower)
     % Forecast one step ahead using previous training data
     currentData = [trainWindPower; testWindPower(1:t-1)];
+    disp(currentData)
     y_pred_AR4(t, 1) = forecast(model_AR4_Fit, 1, 'Y0', currentData);
     
     % Check if we can store the second step prediction
@@ -209,30 +183,6 @@ for t = 1:length(testWindPower)
     end
 end
 
-
-% Define steps and parameters
-steps = 1:3;
-nSteps = length(steps);
-nData = length(testWindPower);
-params = 5; % Number of parameters: AR(4) + variance
-
-% Compute residuals for all steps at once
-residuals_AR4 = testWindPower - y_pred_AR4;
-
-% Compute RSS, RMSE, AIC, and BIC in a vectorized manner
-RSS_AR4 = sum(residuals_AR4.^2, 1);
-RMSE_AR4 = sqrt(mean(residuals_AR4.^2, 1));
-AIC_AR4 = nData * log(RSS_AR4 / nData) + 2 * params;
-BIC_AR4 = nData * log(RSS_AR4 / nData) + params * log(nData);
-
-% Display metrics using a loop for compactness
-metrics = ["RMSE", "AIC", "BIC"];
-for step = steps
-    disp(['Metrics of ', num2str(step), '-step predictions']);
-    disp(['AR(4) RMSE: ', num2str(RMSE_AR4(step))]);
-    disp(['AR(4) AIC: ', num2str(AIC_AR4(step))]);
-    disp(['AR(4) BIC: ', num2str(BIC_AR4(step))]);
-end
 
 % Plot predictions dynamically
 titles = {'AR(4) - 1-step Predictions', 'AR(4) - 2-step Predictions', 'AR(4) - 3-step Predictions'};
