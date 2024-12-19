@@ -125,8 +125,8 @@ function f = plotPredictions(y_true, y_pred, time, titleName)
             legend('Location','northwest', 'Interpreter','latex');
         end
         title(titleName{i}, 'Interpreter', 'latex');
-        xlabel('Time', 'Interpreter','latex');
-        ylabel('Wind Power','Interpreter','latex');
+        xlabel('Time index', 'Interpreter','latex');
+        ylabel('Wind Power [kW]','Interpreter','latex');
         xlim([time_window(1) time_window(end)]);
         grid on;
         box on;
